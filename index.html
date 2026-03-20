@@ -3,42 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IG Viewer Zero Reais</title>
+    <title>Ravi Control - 7 Dias</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #121212; color: #fff; text-align: center; margin: 0; padding: 20px; }
-        .container { max-width: 500px; margin: 0 auto; }
-        input { width: 70%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; }
-        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; background-color: #6200ea; color: white; font-weight: bold; }
-        button:hover { background-color: #3700b3; }
-        #player-container { margin: 20px 0; min-height: 400px; background: #222; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
-        iframe { width: 100%; height: 480px; border: none; border-radius: 10px; }
-        .hidden { display: none; }
-        .action-btn { background-color: #03dac6; color: black; font-size: 18px; width: 100%; padding: 15px; margin-top: 10px; }
+        body { font-family: sans-serif; background: #121212; color: #eee; margin: 0; padding: 15px; text-align: center; }
+        .card { background: #1e1e1e; border-radius: 15px; padding: 15px; margin-bottom: 15px; border: 1px solid #333; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        button { padding: 20px 10px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 14px; }
+        .btn-milk { background: #bb86fc; color: #000; }
+        .btn-food { background: #03dac6; color: #000; }
+        .btn-water { background: #3700b3; color: #fff; }
+        .btn-sleep { background: #cf6679; color: #fff; }
+        .btn-wake { background: #ffde03; color: #000; }
+        .alert { color: #ff9800; font-weight: bold; margin-top: 5px; }
+        .history { text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; background: #000; padding: 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Adicionar Vídeo</h2>
-        <input type="text" id="ig-link" placeholder="Cole o link do Instagram aqui">
-        <button onclick="adicionarVideo()">Enviar</button>
-
-        <div id="player-container">
-            <p id="status-msg">Carregando ou nenhum vídeo novo...</p>
-        </div>
-
-        <button id="btn-visto" class="action-btn hidden" onclick="marcarComoVisto()">Visto 👍 Próximo</button>
+    <div class="card">
+        <h2>Dashboard do Ravi</h2>
+        <div id="summary">Carregando dados...</div>
     </div>
 
-    <!-- Scripts do Firebase (Módulos) -->
+    <div class="grid">
+        <button class="btn-milk" onclick="log('mamou')">🍼 MAMOU</button>
+        <button class="btn-food" onclick="log('comeu')">🍎 COMEU</button>
+        <button class="btn-water" onclick="log('agua', 150)">💧 ÁGUA (150ml)</button>
+        <button class="btn-sleep" onclick="log('dormiu')">😴 DORMIU</button>
+        <button class="btn-wake" onclick="log('acordou')">☀️ ACORDOU</button>
+        <button style="background:#555; color:#fff;" onclick="log('banho')">🛁 BANHO</button>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+        <h3>Últimas 24h</h3>
+        <div id="log-history" class="history"></div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getDatabase, ref, push, query, orderByChild, equalTo, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getDatabase, ref, push, onValue, query, orderByKey, limitToLast, remove, get } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-        // VOCÊ PRECISA SUBSTITUIR ISSO PELAS SUAS CREDENCIAIS DO FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyA-RiPC6pwRT5ysC8TGQBN4G-SQUtXa_nE",
             authDomain: "instax-2211.firebaseapp.com",
-            databaseURL: "https://instax-2211-default-rtdb.firebaseio.com", 
+            databaseURL: "https://instax-2211-default-rtdb.firebaseio.com",
             projectId: "instax-2211",
             storageBucket: "instax-2211.firebasestorage.app",
             messagingSenderId: "598132159365",
@@ -47,60 +54,49 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        let videoAtualId = null;
+        const logRef = ref(db, 'ravi_logs');
 
-        window.adicionarVideo = function() {
-            const link = document.getElementById('ig-link').value;
-            if (!link) return;
+        window.log = (type, val = null) => {
+            push(logRef, { type, value: val, time: Date.now() });
+        };
+
+        function updateUI(data) {
+            if (!data) return;
+            const now = Date.now();
+            const logs = Object.values(data).sort((a,b) => b.time - a.time);
             
-            const match = link.match(/(?:p|reel|reels)\/([A-Za-z0-9_-]+)/);
-            if (match && match[1]) {
-                push(ref(db, 'videos'), {
-                    ig_id: match[1],
-                    status: 'pendente',
-                    timestamp: Date.now()
-                }).then(() => {
-                    document.getElementById('ig-link').value = '';
-                });
-            } else {
-                alert("O link inserido não é um formato reconhecido pelo meu processador.");
+            // Limpeza de 7 dias
+            const sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000);
+            Object.keys(data).forEach(key => {
+                if (data[key].time < sevenDaysAgo) remove(ref(db, 'ravi_logs/' + key));
+            });
+
+            const lastWake = logs.find(l => l.type === 'acordou');
+            const lastEat = logs.find(l => l.type === 'mamou' || l.type === 'comeu');
+            const waterToday = logs.filter(l => l.type === 'agua' && new Date(l.time).toDateString() === new Date().toDateString())
+                                   .reduce((acc, curr) => acc + (curr.value || 0), 0);
+
+            let html = `<p>💧 Água Hoje: <b>${waterToday}ml / 1200ml</b></p>`;
+
+            if (lastWake) {
+                const diffMin = Math.floor((now - lastWake.time) / 60000);
+                html += `<p>☀️ Acordado há: <b>${Math.floor(diffMin/60)}h ${diffMin%60}min</b></p>`;
+                html += `<p class="alert">💤 Previsão Sono: <b>${new Date(lastWake.time + 3*60*60*1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} - ${new Date(lastWake.time + 4*60*60*1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</b></p>`;
             }
-        };
 
-        const carregarProximo = () => {
-            const videosRef = query(ref(db, 'videos'), orderByChild('status'), equalTo('pendente'));
-            onValue(videosRef, (snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                    const chaves = Object.keys(data);
-                    // Pega o mais antigo da fila
-                    chaves.sort((a, b) => data[a].timestamp - data[b].timestamp);
-                    videoAtualId = chaves[0];
-                    const igId = data[videoAtualId].ig_id;
-                    
-                    document.getElementById('player-container').innerHTML = `<iframe src="https://www.instagram.com/p/${igId}/embed/captioned" scrolling="no"></iframe>`;
-                    document.getElementById('btn-visto').classList.remove('hidden');
-                } else {
-                    document.getElementById('player-container').innerHTML = '<p>Fila vazia. Vão trabalhar.</p>';
-                    document.getElementById('btn-visto').classList.add('hidden');
-                    videoAtualId = null;
-                }
-            }, { onlyOnce: true });
-        };
-
-        window.marcarComoVisto = function() {
-            if (videoAtualId) {
-                update(ref(db, `videos/${videoAtualId}`), {
-                    status: 'visto'
-                }).then(() => {
-                    document.getElementById('player-container').innerHTML = '<p>Carregando próximo...</p>';
-                    carregarProximo();
-                });
+            if (lastEat) {
+                const eatDiff = Math.floor((now - lastEat.time) / 60000);
+                html += `<p>🍎 Última Refeição: <b>há ${eatDiff} min</b></p>`;
+                if (eatDiff > 180) html += `<p class="alert" style="color:red">⚠️ Ravi deve estar com fome! (>3h)</p>`;
             }
-        };
 
-        // Inicia a busca inicial
-        carregarProximo();
+            document.getElementById('summary').innerHTML = html;
+
+            const histHtml = logs.slice(0, 20).map(l => `<div>[${new Date(l.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}] ${l.type.toUpperCase()} ${l.value ? l.value+'ml' : ''}</div>`).join('');
+            document.getElementById('log-history').innerHTML = histHtml;
+        }
+
+        onValue(logRef, (snap) => updateUI(snap.val()));
     </script>
 </body>
 </html>
