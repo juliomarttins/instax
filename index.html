@@ -2,45 +2,74 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ravi Control - 7 Dias</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ravi Dashboard v2</title>
     <style>
-        body { font-family: sans-serif; background: #121212; color: #eee; margin: 0; padding: 15px; text-align: center; }
-        .card { background: #1e1e1e; border-radius: 15px; padding: 15px; margin-bottom: 15px; border: 1px solid #333; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        button { padding: 20px 10px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 14px; }
-        .btn-milk { background: #bb86fc; color: #000; }
-        .btn-food { background: #03dac6; color: #000; }
-        .btn-water { background: #3700b3; color: #fff; }
-        .btn-sleep { background: #cf6679; color: #fff; }
-        .btn-wake { background: #ffde03; color: #000; }
-        .alert { color: #ff9800; font-weight: bold; margin-top: 5px; }
-        .history { text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; background: #000; padding: 10px; border-radius: 5px; }
+        :root { --bg: #0f0f0f; --card: #1a1a1a; --primary: #bb86fc; --accent: #03dac6; --error: #cf6679; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: #e0e0e0; margin: 0; padding: 10px; font-size: 14px; }
+        .card { background: var(--card); border-radius: 12px; padding: 15px; margin-bottom: 12px; border: 1px solid #333; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        
+        button { padding: 15px 5px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; text-transform: uppercase; }
+        button:active { transform: scale(0.96); opacity: 0.8; }
+        
+        .btn-eat { background: var(--accent); color: #000; }
+        .btn-sleep { background: #7c4dff; color: #fff; }
+        .btn-med { background: var(--error); color: #fff; }
+        .btn-water { background: #03a9f4; color: #fff; }
+        .btn-wake { background: #ffc107; color: #000; }
+        
+        .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #222; }
+        .alert { color: var(--error); font-weight: bold; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        
+        details { background: #111; border-radius: 8px; margin-top: 5px; }
+        summary { padding: 10px; font-weight: bold; color: var(--primary); outline: none; }
+        .log-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #222; align-items: center; }
+        .log-item:last-child { border: none; }
+        .log-info { flex-grow: 1; margin-left: 10px; }
+        .btn-edit { background: #333; color: #aaa; padding: 5px 10px; font-size: 10px; }
+
+        /* Modal Simples */
+        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; align-items: center; justify-content: center; }
+        .modal-content { background: var(--card); padding: 20px; border-radius: 15px; width: 85%; max-width: 400px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; box-sizing: border-box; }
     </style>
 </head>
 <body>
+
     <div class="card">
-        <h2>Dashboard do Ravi</h2>
-        <div id="summary">Carregando dados...</div>
+        <h2 style="margin:0 0 10px 0; color:var(--primary)">Status do Ravi</h2>
+        <div id="stats">Calculando...</div>
     </div>
 
     <div class="grid">
-        <button class="btn-milk" onclick="log('mamou')">🍼 MAMOU</button>
-        <button class="btn-food" onclick="log('comeu')">🍎 COMEU</button>
-        <button class="btn-water" onclick="log('agua', 150)">💧 ÁGUA (150ml)</button>
-        <button class="btn-sleep" onclick="log('dormiu')">😴 DORMIU</button>
-        <button class="btn-wake" onclick="log('acordou')">☀️ ACORDOU</button>
-        <button style="background:#555; color:#fff;" onclick="log('banho')">🛁 BANHO</button>
+        <button class="btn-eat" onclick="openModal('comeu')">🍱 COMEU / LANCHE</button>
+        <button class="btn-med" onclick="openModal('remedio')">💊 REMÉDIO</button>
+        <button class="btn-sleep" onclick="register('dormiu')">😴 DORMIU</button>
+        <button class="btn-wake" onclick="register('acordou')">☀️ ACORDOU</button>
+        <button class="btn-water" onclick="register('agua')">💧 BEBEU ÁGUA</button>
+        <button style="background:#444; color:#fff" onclick="register('banho')">🛁 BANHO</button>
     </div>
 
-    <div class="card" style="margin-top:20px;">
-        <h3>Últimas 24h</h3>
-        <div id="log-history" class="history"></div>
+    <div id="history-container" style="margin-top: 15px;"></div>
+
+    <div id="modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Registrar</h3>
+            <div id="modal-fields"></div>
+            <input type="datetime-local" id="edit-time">
+            <div style="display:flex; gap:10px;">
+                <button onclick="save()" style="flex:1; background:var(--accent); color:#000">SALVAR</button>
+                <button onclick="closeModal()" style="flex:1; background:#444; color:#fff">CANCELAR</button>
+            </div>
+            <button id="btn-del" onclick="deleteEntry()" style="width:100%; margin-top:10px; background:transparent; color:var(--error); border:1px solid var(--error); display:none">EXCLUIR REGISTRO</button>
+        </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getDatabase, ref, push, onValue, query, orderByKey, limitToLast, remove, get } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getDatabase, ref, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA-RiPC6pwRT5ysC8TGQBN4G-SQUtXa_nE",
@@ -54,49 +83,138 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const logRef = ref(db, 'ravi_logs');
+        const logRef = ref(db, 'ravi_v2');
+        let editingId = null;
+        let currentType = '';
 
-        window.log = (type, val = null) => {
-            push(logRef, { type, value: val, time: Date.now() });
+        // Funções de Interface
+        window.openModal = (type, id = null, existingData = null) => {
+            editingId = id;
+            currentType = type;
+            const fields = document.getElementById('modal-fields');
+            const timeInput = document.getElementById('edit-time');
+            const delBtn = document.getElementById('btn-del');
+            fields.innerHTML = '';
+            
+            delBtn.style.display = id ? 'block' : 'none';
+            timeInput.value = id ? new Date(existingData.time - (3 * 60 * 60 * 1000)).toISOString().slice(0, 16) : new Date(Date.now() - (3 * 60 * 60 * 1000)).toISOString().slice(0, 16);
+
+            if (type === 'comeu') {
+                fields.innerHTML = `<input type="text" id="field-1" placeholder="O que ele comeu?" value="${existingData?.desc || ''}">`;
+            } else if (type === 'remedio') {
+                fields.innerHTML = `<input type="text" id="field-1" placeholder="Nome do remédio" value="${existingData?.desc || ''}">
+                                   <input type="text" id="field-2" placeholder="Dosagem (ex: 5ml, 10 gotas)" value="${existingData?.dose || ''}">`;
+            }
+
+            document.getElementById('modal').style.display = 'flex';
         };
 
-        function updateUI(data) {
-            if (!data) return;
-            const now = Date.now();
-            const logs = Object.values(data).sort((a,b) => b.time - a.time);
+        window.closeModal = () => { document.getElementById('modal').style.display = 'none'; editingId = null; };
+
+        window.register = (type) => {
+            push(logRef, { type, time: Date.now() });
+        };
+
+        window.save = () => {
+            const time = new Date(document.getElementById('edit-time').value).getTime();
+            const desc = document.getElementById('field-1')?.value || '';
+            const dose = document.getElementById('field-2')?.value || '';
             
-            // Limpeza de 7 dias
-            const sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000);
-            Object.keys(data).forEach(key => {
-                if (data[key].time < sevenDaysAgo) remove(ref(db, 'ravi_logs/' + key));
-            });
+            const data = { type: currentType, time, desc, dose };
+            
+            if (editingId) {
+                update(ref(db, `ravi_v2/${editingId}`), data);
+            } else {
+                push(logRef, data);
+            }
+            closeModal();
+        };
 
+        window.deleteEntry = () => { if(confirm('Apagar mesmo?')) { remove(ref(db, `ravi_v2/${editingId}`)); closeModal(); } };
+
+        onValue(logRef, (snapshot) => {
+            const data = snapshot.val() || {};
+            const logs = Object.keys(data).map(id => ({ id, ...data[id] })).sort((a,b) => b.time - a.time);
+            renderStats(logs);
+            renderHistory(logs);
+        });
+
+        function renderStats(logs) {
+            const now = Date.now();
+            const today = new Date().toDateString();
+            
             const lastWake = logs.find(l => l.type === 'acordou');
-            const lastEat = logs.find(l => l.type === 'mamou' || l.type === 'comeu');
-            const waterToday = logs.filter(l => l.type === 'agua' && new Date(l.time).toDateString() === new Date().toDateString())
-                                   .reduce((acc, curr) => acc + (curr.value || 0), 0);
+            const lastSleep = logs.find(l => l.type === 'dormiu');
+            const lastEat = logs.find(l => l.type === 'comeu');
+            const waterCount = logs.filter(l => l.type === 'agua' && new Date(l.time).toDateString() === today).length;
 
-            let html = `<p>💧 Água Hoje: <b>${waterToday}ml / 1200ml</b></p>`;
+            let html = `
+                <div class="stat-row"><span>💧 Água hoje:</span> <b>${waterCount} vezes</b></div>
+            `;
 
-            if (lastWake) {
-                const diffMin = Math.floor((now - lastWake.time) / 60000);
-                html += `<p>☀️ Acordado há: <b>${Math.floor(diffMin/60)}h ${diffMin%60}min</b></p>`;
-                html += `<p class="alert">💤 Previsão Sono: <b>${new Date(lastWake.time + 3*60*60*1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} - ${new Date(lastWake.time + 4*60*60*1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</b></p>`;
+            if (lastWake && (!lastSleep || lastWake.time > lastSleep.time)) {
+                const diff = Math.floor((now - lastWake.time) / 60000);
+                html += `<div class="stat-row"><span>🕒 Acordado há:</span> <b>${Math.floor(diff/60)}h ${diff%60}m</b></div>`;
+                html += `<div class="stat-row"><span>💤 Próximo Soninho:</span> <b>${new Date(lastWake.time + 3.5*60*60*1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</b></div>`;
+            } else if (lastSleep) {
+                const diff = Math.floor((now - lastSleep.time) / 60000);
+                html += `<div class="stat-row"><span>😴 Dormindo há:</span> <b>${Math.floor(diff/60)}h ${diff%60}m</b></div>`;
             }
 
             if (lastEat) {
-                const eatDiff = Math.floor((now - lastEat.time) / 60000);
-                html += `<p>🍎 Última Refeição: <b>há ${eatDiff} min</b></p>`;
-                if (eatDiff > 180) html += `<p class="alert" style="color:red">⚠️ Ravi deve estar com fome! (>3h)</p>`;
+                const diffEat = Math.floor((now - lastEat.time) / 60000);
+                const nextEat = new Date(lastEat.time + 2.5*60*60*1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                html += `<div class="stat-row"><span>🍎 Próxima Refeição:</span> <b>${nextEat}</b></div>`;
+                if (diffEat > 180) html += `<div class="alert">⚠️ Ravi sem comer há ${Math.floor(diffEat/60)}h!</div>`;
             }
 
-            document.getElementById('summary').innerHTML = html;
-
-            const histHtml = logs.slice(0, 20).map(l => `<div>[${new Date(l.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}] ${l.type.toUpperCase()} ${l.value ? l.value+'ml' : ''}</div>`).join('');
-            document.getElementById('log-history').innerHTML = histHtml;
+            document.getElementById('stats').innerHTML = html;
         }
 
-        onValue(logRef, (snap) => updateUI(snap.val()));
+        function renderHistory(logs) {
+            const groups = {};
+            logs.forEach(l => {
+                const date = new Date(l.time).toLocaleDateString();
+                if (!groups[date]) groups[date] = [];
+                groups[date].push(l);
+            });
+
+            const container = document.getElementById('history-container');
+            container.innerHTML = '';
+
+            Object.keys(groups).slice(0, 7).forEach((date, i) => {
+                const isToday = date === new Date().toLocaleDateString();
+                const det = document.createElement('details');
+                if (isToday) det.open = true;
+                
+                const summ = document.createElement('summary');
+                summ.textContent = isToday ? "HOJE" : date;
+                det.appendChild(summ);
+
+                groups[date].forEach(l => {
+                    const item = document.createElement('div');
+                    item.className = 'log-item';
+                    const timeStr = new Date(l.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                    
+                    let info = `<b>${l.type.toUpperCase()}</b>`;
+                    if (l.desc) info += `<br><small>${l.desc} ${l.dose || ''}</small>`;
+
+                    item.innerHTML = `
+                        <span style="color:#888">${timeStr}</span>
+                        <div class="log-info">${info}</div>
+                        <button class="btn-edit" onclick="editProxy('${l.id}')">EDITAR</button>
+                    `;
+                    det.appendChild(item);
+                });
+                container.appendChild(det);
+            });
+            
+            // Proxy para acessar dados do Firebase no clique do edit
+            window.editProxy = (id) => {
+                const item = logs.find(x => x.id === id);
+                openModal(item.type, id, item);
+            };
+        }
     </script>
 </body>
 </html>
